@@ -1,18 +1,18 @@
 from collections import deque
 
-from nanovllm.config import Config
+from nanovllm.config import SimConfig
 from nanovllm.engine.sequence import Sequence, SequenceStatus
 from nanovllm.engine.block_manager import BlockManager
 
 
 class Scheduler:
 
-    def __init__(self, config: Config):
-        self.max_num_seqs = config.max_num_seqs
-        self.max_num_batched_tokens = config.max_num_batched_tokens
-        self.eos = config.eos
-        self.block_size = config.kvcache_block_size
-        self.block_manager = BlockManager(config.num_kvcache_blocks, config.kvcache_block_size)
+    def __init__(self, simconfig: SimConfig):
+        self.max_num_seqs = simconfig.max_num_seqs
+        self.max_num_batched_tokens = simconfig.max_num_batched_tokens
+        self.eos = simconfig.eos
+        self.block_size = simconfig.kvcache_block_size
+        self.block_manager = BlockManager(simconfig.num_kvcache_blocks, simconfig.kvcache_block_size)
         self.waiting: deque[Sequence] = deque()
         self.running: deque[Sequence] = deque()
 
@@ -28,6 +28,8 @@ class Scheduler:
 
         # prefill
         while self.waiting and len(scheduled_seqs) < self.max_num_seqs:
+            print("Current phase: prefill")
+            print(f"Seq id: {self.waiting[0].seq_id}")
             seq = self.waiting[0]
             remaining = self.max_num_batched_tokens - num_batched_tokens
             if remaining == 0:
@@ -56,6 +58,8 @@ class Scheduler:
 
         # decode
         while self.running and len(scheduled_seqs) < self.max_num_seqs:
+            print("Current phase: decode")
+            print(f"Seq id: {self.running[0].seq_id}")
             seq = self.running.popleft()
             while not self.block_manager.can_append(seq):
                 if self.running:
@@ -86,7 +90,7 @@ class Scheduler:
             if is_prefill and seq.num_cached_tokens < seq.num_tokens:
                 continue
             seq.append_token(token_id)
-            if (not seq.ignore_eos and token_id == self.eos) or seq.num_completion_tokens == seq.max_tokens:
+            if token_id == self.eos or seq.num_completion_tokens == seq.max_tokens:
                 seq.status = SequenceStatus.FINISHED
                 self.block_manager.deallocate(seq)
                 self.running.remove(seq)
