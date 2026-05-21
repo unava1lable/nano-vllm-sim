@@ -15,7 +15,6 @@ class SimModelRunner:
             if is_prefill:
                 prefilled_tokens = seq.num_scheduled_tokens
                 time_ms = prefilled_tokens * self.config.prefill_per_token_ms
-                print(f"Sequence {seq.seq_id} prefill time: {time_ms} ms")
             else:
                 decode_tokens = seq.num_scheduled_tokens
                 context_tokens = len(seq)
@@ -23,7 +22,6 @@ class SimModelRunner:
                     decode_tokens * self.config.decode_per_token_ms
                     + context_tokens * self.config.decode_context_per_token_ms
                 )
-                print(f"Sequence {seq.seq_id} decode time: {time_ms} ms")
             total_time += time_ms    
 
         token_id = 2 if self.config.eos != 2 else 3

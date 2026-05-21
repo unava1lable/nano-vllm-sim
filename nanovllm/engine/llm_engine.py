@@ -1,10 +1,11 @@
 from dataclasses import fields
-from time import perf_counter
+from pprint import pprint
 
 from nanovllm.config import SimConfig
 from nanovllm.engine.sequence import Sequence
 from nanovllm.engine.scheduler import Scheduler
 from nanovllm.engine.model_runner import SimModelRunner
+from nanovllm.engine.metrics import StepTrace, summarize_traces
 
 
 class LLMEngine:
@@ -19,6 +20,8 @@ class LLMEngine:
 
         self.sim_model_runner = SimModelRunner(config)
         self.scheduler = Scheduler(config)
+        self.step_id = 0
+        self.traces: list[StepTrace] = []
 
     def add_request(self, prompt: str | list[int]):
         if isinstance(prompt, str):
@@ -28,11 +31,24 @@ class LLMEngine:
 
     def step(self):
         seqs, is_prefill = self.scheduler.schedule()
-        num_tokens = sum(seq.num_scheduled_tokens for seq in seqs) if is_prefill else -len(seqs)
-        token_ids, total_time = self.sim_model_runner.run(seqs, is_prefill)
+        phase = "prefill" if is_prefill else "decode"
+        scheduled_tokens = sum(seq.num_scheduled_tokens for seq in seqs)
+        seq_ids = [seq.seq_id for seq in seqs]
+        token_ids, latency_ms = self.sim_model_runner.run(seqs, is_prefill)
+        trace = StepTrace(
+            step_id=self.step_id,
+            phase=phase,
+            seq_ids=seq_ids,
+            scheduled_tokens=scheduled_tokens,
+            latency_ms=latency_ms,
+            used_blocks=len(self.scheduler.block_manager.used_block_ids),
+            free_blocks=len(self.scheduler.block_manager.free_block_ids),
+        )
         self.scheduler.postprocess(seqs, token_ids, is_prefill)
         outputs = [(seq.seq_id, seq.completion_token_ids) for seq in seqs if seq.is_finished]
-        return outputs, num_tokens, total_time
+        self.step_id += 1
+        self.traces.append(trace)
+        return outputs
 
     def is_finished(self):
         return self.scheduler.is_finished()
@@ -44,19 +60,15 @@ class LLMEngine:
         for prompt in prompts:
             self.add_request(prompt)
         outputs = {}
-        prefill_throughput = decode_throughput = 0.
         while not self.is_finished():
-            t = perf_counter()
-            output, num_tokens, total_time = self.step()
-            if num_tokens > 0:
-                prefill_throughput = num_tokens / (total_time / 1000)
-                print(f"prefill throughput: {prefill_throughput:.2f} tokens/s")
-            else:
-                decode_throughput = -num_tokens / (total_time / 1000)
-                print(f"decode throughput: {decode_throughput:.2f} tokens/s")
+            output = self.step()
             for seq_id, token_ids in output:
                 outputs[seq_id] = token_ids
 
         outputs = [outputs[seq_id] for seq_id in sorted(outputs.keys())]
         outputs = [{"text": "sim text", "token_ids": token_ids} for token_ids in outputs]
         return outputs
+    
+
+    def print_traces(self):
+        pprint(summarize_traces(self.traces))

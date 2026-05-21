@@ -16,6 +16,8 @@ def main():
         print(f"Prompt: {prompt!r}")
         print(f"Completion: {output['text']!r}")
 
+    print("\n")
+    llm.print_traces()
 
 if __name__ == "__main__":
     main()

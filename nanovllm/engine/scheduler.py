@@ -28,8 +28,6 @@ class Scheduler:
 
         # prefill
         while self.waiting and len(scheduled_seqs) < self.max_num_seqs:
-            print("Current phase: prefill")
-            print(f"Seq id: {self.waiting[0].seq_id}")
             seq = self.waiting[0]
             remaining = self.max_num_batched_tokens - num_batched_tokens
             if remaining == 0:
@@ -58,8 +56,6 @@ class Scheduler:
 
         # decode
         while self.running and len(scheduled_seqs) < self.max_num_seqs:
-            print("Current phase: decode")
-            print(f"Seq id: {self.running[0].seq_id}")
             seq = self.running.popleft()
             while not self.block_manager.can_append(seq):
                 if self.running:
