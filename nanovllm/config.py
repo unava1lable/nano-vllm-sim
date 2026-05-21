@@ -13,3 +13,15 @@ class SimConfig:
     decode_context_per_token_ms: float = 0.0
     scheduler_policy: str | None = None
     eos: int = 1
+
+
+@dataclass
+class RequestConfig:
+    max_tokens: int = 256
+    arrival_time_ms: float = 0.0
+
+    def __post_init__(self):
+        if self.max_tokens <= 0:
+            raise ValueError("max_tokens must be positive")
+        if self.arrival_time_ms < 0.0:
+            raise ValueError("arrival_time_ms must be non-negative")

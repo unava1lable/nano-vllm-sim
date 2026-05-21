@@ -2,6 +2,8 @@ from copy import copy
 from enum import Enum, auto
 from itertools import count
 
+from nanovllm.config import RequestConfig
+
 
 class SequenceStatus(Enum):
     WAITING = auto()
@@ -13,7 +15,7 @@ class Sequence:
     block_size = 256
     counter = count()
 
-    def __init__(self, token_ids: list[int]):
+    def __init__(self, token_ids: list[int], request_config: RequestConfig):
         self.seq_id = next(Sequence.counter)
         self.status = SequenceStatus.WAITING
         self.token_ids = copy(token_ids)
@@ -24,7 +26,8 @@ class Sequence:
         self.num_scheduled_tokens = 0
         self.is_prefill = True
         self.block_table = []
-        self.max_tokens = 256
+        self.max_tokens = request_config.max_tokens
+        self.arrival_time_ms = request_config.arrival_time_ms
 
     def __len__(self):
         return self.num_tokens

@@ -1,7 +1,7 @@
 from dataclasses import fields
 from pprint import pprint
 
-from nanovllm.config import SimConfig
+from nanovllm.config import SimConfig, RequestConfig
 from nanovllm.engine.sequence import Sequence
 from nanovllm.engine.scheduler import Scheduler
 from nanovllm.engine.model_runner import SimModelRunner
@@ -23,10 +23,10 @@ class LLMEngine:
         self.step_id = 0
         self.traces: list[StepTrace] = []
 
-    def add_request(self, prompt: str | list[int]):
+    def add_request(self, prompt: str | list[int], request_config: RequestConfig):
         if isinstance(prompt, str):
             prompt = [ord(c) for c in prompt]
-        seq = Sequence(prompt)
+        seq = Sequence(prompt, request_config)
         self.scheduler.add(seq)
 
     def step(self):
@@ -56,9 +56,17 @@ class LLMEngine:
     def generate(
         self,
         prompts: list[str] | list[list[int]],
+        request_configs: RequestConfig | list[RequestConfig] | None = None,
     ) -> list[str]:
-        for prompt in prompts:
-            self.add_request(prompt)
+        if isinstance(request_configs, RequestConfig):
+            request_configs = [request_configs] * len(prompts)
+        elif request_configs is None:
+            request_configs = [RequestConfig()] * len(prompts)
+        if len(prompts) != len(request_configs):
+            raise ValueError("prompts and request_configs must have the same length")
+
+        for prompt, request_config in zip(prompts, request_configs):
+            self.add_request(prompt, request_config)
         outputs = {}
         while not self.is_finished():
             output = self.step()

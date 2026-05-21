@@ -1,4 +1,4 @@
-from nanovllm import LLM
+from nanovllm import LLM, RequestConfig
 
 
 def main():
@@ -9,7 +9,13 @@ def main():
         "list all prime numbers within 100",
     ]
 
-    outputs = llm.generate(prompts)
+    outputs = llm.generate(
+        prompts,
+        request_configs = [
+            RequestConfig(max_tokens=32),
+            RequestConfig(max_tokens=128),
+        ]
+    )
 
     for prompt, output in zip(prompts, outputs):
         print("\n")
